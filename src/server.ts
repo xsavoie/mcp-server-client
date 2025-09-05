@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import fs from "node:fs/promises";
+import { mime } from "zod/v4";
+import { json } from "node:stream/consumers";
 
 const server = new McpServer({
     name: "test agent",
@@ -12,6 +14,30 @@ const server = new McpServer({
         prompts: {}
     }
 });
+
+server.resource(
+    "users",
+    "users://all",
+    {
+        description: "Get all users in the database",
+        title: "Users",
+        mimeType: "application/json",
+    }, async uri => {
+        const users = await import("./data/users.json", {
+            with: { type: "json" }
+        }).then(m => m.default);
+
+        return {
+            contents: [
+                {
+                    uri: uri.href,
+                    text: JSON.stringify(users),
+                    mimeType: "application/json"
+                }
+            ]
+        }
+    }
+)
 
 server.tool("create-user", "Create a new user in the database", {
     name: z.string(),
@@ -28,15 +54,11 @@ server.tool("create-user", "Create a new user in the database", {
     try {
         const id = await createUser(params);
         return {
-            content: [
-                { type: "text", text: `User ${id} created successfully` }
-            ]
+            content: [{ type: "text", text: `User ${id} created successfully` }]
         }
     } catch (error) {
         return {
-            content: [
-                { type: "text", text: "Failed to save user" }
-            ]
+            content: [{ type: "text", text: "Failed to save user" }]
         }
     }
 });
